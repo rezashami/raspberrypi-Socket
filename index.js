@@ -63,41 +63,61 @@ var getDecrypted = s => {
   return x;
 };
 
+var intervalId;
 socket.on("connect", function() {
   console.log("Connected!");
-  socket.emit("host-login", getEncrypted("Host"));
+  var info ={
+    userName:"Rasp",
+    password: "admin123"
+  };
+  const data = JSON.stringify(info);
+  socket.emit("rasp-login", getEncrypted(data));
 });
 
-socket.on("response", function(data) {
-  var res = getDecrypted(data);
-  if (res === "NoAuth") {
+socket.on("No-Auth", function(data) {
+    console.log("User is No recogenized");
     socket.disconnect();
-  } else {
-    console.log("User is recogenized");
-  }
 });
 
-socket.on("full", function() {
-  console.log("Server is full");
+socket.on("welcome-rasp", function() {
+  console.log("Raspberry start working");
+  intervalId =setInterval(() => {
+    sensor.read(11, 4, function(err, temperature, humidity) {
+      if (err) {
+        socket.emit("error-temp", getEncrypted(JSON.stringify(err)));
+      } else {
+        const data = JSON.stringify({ temperature, humidity });
+        socket.emit("temp", getEncrypted(data));
+        console.log("Data sent", data);
+      }
+    });
+  }, 5000);
 });
 
-socket.on("message", function(data) {
+socket.on("NewCommand", function(data) {
   console.log(getDecrypted(data));
 });
 
+socket.on("No-android", function(){
+  console.log("No android device!!");
+  clearInterval(intervalId);
+});
+socket.on("Android-disconnected", function(){
+  console.log("Android device is disconnected!!");
+  clearInterval(intervalId);
+});
+socket.on("Sended-temp", function(){
+  console.log("Tempurator is sended ture");
+});
+socket.on("Sended-error", function(){
+  console.log("Tempurator is not sended. Error sended");
+});
 socket.on("disconnect", function() {
   console.log("User is Disconnected");
+  clearInterval(intervalId);
+  process.exit();
 });
 
-setInterval(() => {
-  sensor.read(11, 4, function(err, temperature, humidity) {
-    if (err) {
-      socket.emit("error", getEncrypted(JSON.stringify(err)));
-    } else {
-      const data = JSON.stringify({ temperature, humidity });
-      socket.emit("data", getEncrypted(data));
-      console.log("Data sent", data);
-    }
-  });
-}, 5000);
+
+
 
